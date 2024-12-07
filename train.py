@@ -1,16 +1,21 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.mixed_precision import set_global_policy
 import matplotlib.pyplot as plt
 import os
+import shutil
+
+# Enable mixed precision for faster training
+set_global_policy('mixed_float16')
 
 # Set random seed for reproducibility
 tf.random.set_seed(42)
 
 # Model parameters
-IMG_HEIGHT = 224
-IMG_WIDTH = 224
-BATCH_SIZE = 32
+IMG_HEIGHT = 160
+IMG_WIDTH = 160
+BATCH_SIZE = 64
 EPOCHS = 15
 
 def create_model(num_classes):
@@ -67,7 +72,56 @@ def plot_training_history(history):
     plt.savefig('training_history.png')
     plt.close()
 
+def prepare_apple_dataset():
+    # Create directories for apple-only dataset
+    apple_dataset_path = 'apple_dataset'
+    if os.path.exists(apple_dataset_path):
+        shutil.rmtree(apple_dataset_path)
+    
+    os.makedirs(os.path.join(apple_dataset_path, 'train'))
+    os.makedirs(os.path.join(apple_dataset_path, 'val'))
+    
+    # Copy apple-related folders
+    apple_classes = [
+        'Apple___Apple_scab',
+        'Apple___Black_rot',
+        'Apple___Cedar_apple_rust',
+        'Apple___healthy'
+    ]
+    
+    for class_name in apple_classes:
+        # Create directories
+        os.makedirs(os.path.join(apple_dataset_path, 'train', class_name))
+        os.makedirs(os.path.join(apple_dataset_path, 'val', class_name))
+        
+        # Get list of images
+        source_dir = os.path.join('dataset/train', class_name)
+        images = os.listdir(source_dir)
+        
+        # Split into train (80%) and validation (20%)
+        split_idx = int(len(images) * 0.8)
+        train_images = images[:split_idx]
+        val_images = images[split_idx:]
+        
+        # Copy images
+        for img in train_images:
+            shutil.copy2(
+                os.path.join(source_dir, img),
+                os.path.join(apple_dataset_path, 'train', class_name, img)
+            )
+        
+        for img in val_images:
+            shutil.copy2(
+                os.path.join(source_dir, img),
+                os.path.join(apple_dataset_path, 'val', class_name, img)
+            )
+    
+    return apple_dataset_path
+
 def main():
+    # Prepare apple-only dataset
+    apple_dataset_path = prepare_apple_dataset()
+    
     # Data augmentation for training
     train_datagen = ImageDataGenerator(
         rescale=1./255,
@@ -75,32 +129,26 @@ def main():
         width_shift_range=0.2,
         height_shift_range=0.2,
         horizontal_flip=True,
-        fill_mode='nearest',
-        validation_split=0.2
+        fill_mode='nearest'
     )
 
     # Only rescaling for validation
-    val_datagen = ImageDataGenerator(
-        rescale=1./255,
-        validation_split=0.2
-    )
+    val_datagen = ImageDataGenerator(rescale=1./255)
 
     # Load training data
     train_generator = train_datagen.flow_from_directory(
-        'dataset/train',
+        os.path.join(apple_dataset_path, 'train'),
         target_size=(IMG_HEIGHT, IMG_WIDTH),
         batch_size=BATCH_SIZE,
-        class_mode='categorical',
-        subset='training'
+        class_mode='categorical'
     )
 
     # Load validation data
     validation_generator = val_datagen.flow_from_directory(
-        'dataset/train',
+        os.path.join(apple_dataset_path, 'val'),
         target_size=(IMG_HEIGHT, IMG_WIDTH),
         batch_size=BATCH_SIZE,
-        class_mode='categorical',
-        subset='validation'
+        class_mode='categorical'
     )
 
     # Create and compile model
@@ -124,12 +172,17 @@ def main():
     plot_training_history(history)
 
     # Save the model
-    model.save('plant_disease_model.h5')
+    model.save('apple_disease_model.h5')
     
     # Save class indices
     import json
-    with open('class_indices.json', 'w') as f:
+    with open('apple_class_indices.json', 'w') as f:
         json.dump(train_generator.class_indices, f)
+
+    print("\nTraining completed!")
+    print("Model saved as 'apple_disease_model.h5'")
+    print("Class indices saved as 'apple_class_indices.json'")
+    print("\nAvailable classes:", train_generator.class_indices)
 
 if __name__ == '__main__':
     main()

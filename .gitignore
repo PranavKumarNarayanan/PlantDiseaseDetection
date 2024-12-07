@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,10 +19,29 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Virtual Environment
 venv/
+ENV/
 .env
 .venv
 env/
-ENV/
+
+# Dataset and Models
+dataset/
+apple_dataset/
+*.h5
+*.pkl
+*.pth
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+training_history.png
+apple_class_indices.json
+.DS_Store
